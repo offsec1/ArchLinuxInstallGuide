@@ -1,0 +1,90 @@
+Arch post installation + install GUI (gnome)
+
+Step 1 set locale system wide to avoid some bugs
+	localectl set-locale LANG="en_US.UTF-8"
+
+Step 2 activate/setup swap partition
+- find your swap
+	fdisk -l										#find your swap location
+	- alternativly
+		blkid
+- setup swap
+	mkswap [/dev/mapper/volgroup0-lv_swap] 							#use your proper device
+- write down UUID!
+- change file
+	nano /etc/fstab
+	#add following
+	#UUID=[wrote down UUID] none swap defaults 0 0
+	- if ssd hard drive
+		#add 'discard' after rw for / and /home
+	<save N' exit>
+- reboot and check if swap works
+	reboot
+	free -m											#swap should NOT be 0
+
+Step 3 change pacman.conf so you can install 32bit packages
+	nano /etc/pacman.conf
+	#uncomment: [multilib]
+	#uncomment: Include = /etc/pacman.d/mirrorlist
+	<save 'N exit>
+
+Step 4 (internet required) install packages
+- network manager
+	pacman -Sy networkmanager network-manager-applet dialog
+	<default>
+	<default> 
+- x window enviroment
+	pacman -Sy xf86-input-libinput xorg-server xorg-xinit xorg-server-utils mesa	#xorg-server-utils may be obsolete and mesa is just beeing upgraded
+	<default>
+- video driver
+	- NVIDIA open source (reccommended but evetually slower)
+		pacman -Sy xf86-video-nouveau lib32-nouveau-dri
+		<default>
+	- NVIDIA closed binary (faster)
+		pacman -Sy nvidia lib32-nvidia-libgl
+	- INTEL
+		pacman -Sy xf86-video-intel lib32-intel-dri lib32-mesa lib32-libgl
+		<default>
+		<default>
+	- Virtual box
+		pacman -Sy virtualbox-guest-utils
+		<default>
+		<default>
+- install sudo
+	pacman -Sy sudo
+- setup sudo
+	visudo
+	#uncomment: %wheel ALL=(ALL) ALL
+	#Todo so:
+		x
+		x
+		;
+		:wq
+
+Step 5 create user account
+	useradd -m -G wheel -s /bin/bash [name]							#-m create home directory, -G group wheel, -s shell
+	passwd [name]
+	<enter password>
+	<verify>
+
+Step 6 name machine if you care
+	hostnamectl set-hostname [name]
+	
+Step 7 install GUI
+- install display manager (gdm)
+	pacman -Sy gdm
+	<default>...
+- install desktop enviroment (gnome)
+	pacman -Sy gnome gnome-extra
+	<default>...
+
+Step 8 enable display manager & reboot
+	systemctl enable gdm
+	reboot
+
+	
+
+
+
+
+

@@ -1,0 +1,145 @@
+Install Arch Linux OS:
+
+Step 0 
+Boot from *.iso
+
+Step 1 Create fresh partition layout using 'fdisk':
+- check hard drive names, etc.
+	fdisk -l
+- create /boot partition
+	fdisk /dev/sda								#choose your disk
+	o 									#start new partition layout
+	n 									#new
+	<default> 								#partition type: primary
+	<default> 								#partiton number: 1
+	<default> 								#first sector: default
+	+400M 									#size ca. 400MB because /boot partition
+	a									#make it bootable
+- create encrypted LVM parition (still in fdisk)
+	n 									#new
+	<default> 								#partition type: primary
+	<default> 								#partiton number: 2
+	<default>								#first sector: default
+	<default>								#last sector: default (or size you want)
+	t									#change type
+	2									#choose partition
+	8E									#Linux LVM
+	w									#write changes
+
+Maybe check now fdisk -l first
+
+Step 2 setup encryption:
+	cryptsetup luksFormat /dev/[sda2] 					#encrypt the disk sda2 (change to yours)
+	YES
+	<psswd>									#enter your passphrase
+
+Step 3 open and unencrypt volume:
+	cryptsetup open --type luks /dev/[sda2] lvm				#encrypt
+
+Step 4 setup our logical volume for our os:
+- create lvm (Logical Volume Management)
+	pvcreate --dataalignment 1m /dev/mapper/lvm				#--dataalignment 1m just for SSD's
+- create volume group
+	vgcreate volgroup0 /dev/mapper/lvm					#creates volume group 'volgroup0' on ../lvm
+
+- create 3 logical volumes
+	lvcreate -L 30GB volgroup0 -n lv_root					#create /root volume (size 30GB)
+	lvcreate -L 2GB volgroup0 -n lv_swap					#create /swap volume (size 2GB)
+	lvcreate -l 100%FREE volgroup0 -n lv_home				#create /home volume (size *)
+	modprobe dm_mod								#run device mapper
+	vgscan									#scans disks and rebuilds caches
+	vgchange -ay								#activate volume groups
+- format logical volumes
+	mkfs.ext2 /dev/[sda1]							#make /boot partition ext2
+	mkfs.ext4 /dev/volgroup0/lv_root					#make /root partition ext4
+	mkfs.ext4 /dev/volgroup0/lv_home					#make /home partition ext4
+- mount partitions
+	mount /dev/volgroup0/lv_root /mnt					#mount /root in /mnt
+	mkdir /mnt/boot								#create /mnt/boot directory
+	mount /dev/sda1 /mnt/boot						#mount /boot in /mnt/boot
+	mkdir /mnt/home								#create /mnt/home directory
+	mount /dev/volgroup0/lv_home /mnt/home					#mount /home in /mnt/home
+
+Step 5 install necessary packages (internet connection needed)
+- check for working internet connection
+	ip a									#shows your interfaces and ip address
+- if no internet connection is active and you're using wifi
+	cp /etc/metctl/examples/wireless-wpa /etc/netctl/wireless-wifi		#copies conf files
+	nano /etc/netctl/wireless-wifi
+		#change Interface=[xxx] to your wifi interface (e.g wlan0)
+		#change ESSIS=[xxx] to your wifi network
+		#change Key=[xxx] to your wifi password
+		#exit & save file
+	netctl start wireless-wifi
+- if no internet connection is active and you're using lan
+	dhcpcd		#assings an ip address to your thruough the router
+- install packages
+	pacstrap -i /mnt base							#installs the base into /mnt
+	<default>								#you want to install everything
+	Y									#Yes we want to install
+
+Step 6 generate /etc/fstab file
+	genfstab -U -p /mnt >> /mnt/etc/fstab					#generates fstab file!
+
+Step 7 install further packages for using the os
+- chroot into os (/mnt)
+	arch-chroot /mnt							#kind of uses the installed os rather than live os
+-install packages
+	pacman -Sy grub-bios linux-headers 					#these are important (check)
+
+Step 8 setup a view things
+- edit mkinitcpio.conf so computer knows lvm2 to boot from	
+	nano /etc/mkinitcpio.conf						#edit this file
+	HOOKS=(...block encrypt lvm2 filesystems...)				#add this! important!
+	<save N' exit>
+- setup hooks so we can actually boot to /root and os knows lvm2
+	mkinitcpio -p linux							#setup hooks (do this for lts kernel as well if used)
+- edit locale.gen for proper character display from os
+	nano /etc/locale.gen							#use UTF-8 as standard
+	#search ur locale and remove '#'
+	<save N' exit>
+	locale-gen 								#does set it up
+- edit clock
+	ln -sf /usr/share/zoneinfo/[yourLocation] /etc/localtime		#find your location (using tab) and run
+	hwclock --systohc --utc							#sync clock
+- set root password
+	passwd									#sets root password
+	<enter password>
+	<confirm>
+- edit grub so grub know we're using encryption
+	nano /etc/default/grub							#edit this file
+	GRUB_CMDLINE_LINUX_DEFAULT="cryptdevice=/dev/sda2:volgroup0 quiet"	#chang this so it looks like <- this!
+	<save N' exit>
+- install grub
+	grub-install --target=i386-pc --recheck /dev/sda			#no number on sda!
+- change grub... copy file so grub knows your language and keyboard (english,german,etc.)
+	cp /usr/share/locale/en\@quot/LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
+	grub-mkconfig -o /boot/grub/grub.cfg					#does it setup (ignor the warnings)
+
+Step 9 exit chroot, unmount everything and reboot
+	exit
+	umount /mnt/boot
+	umount /mnt/home
+	umount /mnt
+	reboot
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
